@@ -81,3 +81,57 @@ for i, query in enumerate(cleaned_queries, start=1):
     print(query)
     print("\n-----------------------\n")
 cleaned_queries
+
+
+
+---------------
+
+import streamlit as st
+import re
+
+def extract_table_names(main_query_part):
+    table_names = re.findall(r'(\b\w+\b)\s+AS\s+\(', main_query_part)
+    return [(name, name) for name in table_names]
+
+def replace_table_references(main_query_part, table_names):
+    for name, alias in table_names:
+        main_query_part = re.sub(fr'\b{re.escape(name)}\b(?! AS \()', f'{{ref("{alias}")}}', main_query_part)
+    return main_query_part
+
+def extract_sql_queries(sql):
+    pattern = r'(?i)(?:\bWITH\b.*?\bAS\b|\bSELECT\b).*?(?=\bWITH\b|\bSELECT\b|\Z)'
+    queries = re.findall(pattern, sql, re.DOTALL)
+    return queries
+
+def clean_sql_query(query):
+    query = query.strip()
+    query = query.rstrip(';')
+    query = re.sub(r'\bWITH\b.*?(?=\bSELECT\b)', '', query, flags=re.DOTALL)
+    query = re.sub(r'\)[^\)]*$', '', query)
+    return query
+
+def filter_select_queries(queries):
+    return [query for query in queries if query.startswith('SELECT')]
+
+def save_queries_to_sql_files(queries):
+    for i, query in enumerate(queries, start=1):
+        with open(f"query_{i}.sql", "w") as f:
+            f.write(query)
+
+def main():
+    st.title("CTE Query Processor")
+
+    cte_queries = st.text_area("Masukkan CTE queries di sini", height=200)
+
+    if st.button("Proses"):
+        table_names = extract_table_names(cte_queries)
+        main_query_part = replace_table_references(cte_queries, table_names)
+        sql_queries = extract_sql_queries(main_query_part)
+        select_queries = filter_select_queries(sql_queries)
+        cleaned_queries = [clean_sql_query(query) for query in select_queries]
+        
+        save_queries_to_sql_files(cleaned_queries)
+        st.success("Queries telah diproses dan disimpan dalam file .sql")
+
+if __name__ == "__main__":
+    main()
