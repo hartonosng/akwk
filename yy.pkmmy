@@ -1,31 +1,21 @@
 import streamlit as st
-from rapidfuzz import fuzz
 
-# Daftar opsi yang tersedia
-options = ["Apple", "Banana", "Cherry", "Grapes", "Mango", "Orange"]
+# Buat list opsi untuk selectbox
+options = ["Option 1", "Option 2", "Option 3", "Another Option", "More Options"]
 
-# Inisialisasi session state untuk input pengguna dan opsi yang ditampilkan
-if "filtered_options" not in st.session_state:
-    st.session_state.filtered_options = ["Ketik minimal 5 huruf..."]
-if "selected_text" not in st.session_state:
-    st.session_state.selected_text = ""
+# Ambil input dari selectbox
+selected_option = st.selectbox("Choose an option:", options, key="selected_option", disabled=True)
 
-# Selectbox awal untuk input
-selected_option = st.selectbox("Ketik atau pilih opsi:", st.session_state.filtered_options)
+# Cek apakah sudah ada input
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
 
-# Perbarui state berdasarkan pilihan pengguna
-if selected_option and selected_option != "Ketik minimal 5 huruf...":
-    st.session_state.selected_text = selected_option
+# Tambahkan teks input di session state dengan widget yang tidak terlihat
+st.session_state.input_text = st.text_area("Hidden Input", "", key="hidden_input", label_visibility="collapsed")
 
-# Jika pengguna mengetik minimal 5 huruf, filter opsi berdasarkan similarity
-if len(st.session_state.selected_text) >= 5:
-    matching_options = [
-        opt for opt in options if fuzz.ratio(st.session_state.selected_text.lower(), opt.lower()) > 80
-    ]
-    st.session_state.filtered_options = matching_options if matching_options else ["Tidak ada opsi yang cocok"]
-else:
-    st.session_state.filtered_options = ["Ketik minimal 5 huruf..."]
+# Hitung jumlah kata
+word_count = len(st.session_state.input_text.split())
 
-# Jika pengguna memilih opsi yang valid, tampilkan hasilnya
-if selected_option and selected_option not in ["Ketik minimal 5 huruf...", "Tidak ada opsi yang cocok"]:
-    st.write(f"Anda memilih: {selected_option}")
+# Jika lebih dari 5 kata, aktifkan selectbox
+if word_count > 5:
+    st.selectbox("Choose an option:", options, key="selected_option", disabled=False)
