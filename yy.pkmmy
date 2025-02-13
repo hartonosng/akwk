@@ -1,21 +1,76 @@
 import streamlit as st
+from streamlit_datalist import stDatalist
+import random
+import jellyfish
+from collections import OrderedDict
 
-# Buat list opsi untuk selectbox
-options = ["Option 1", "Option 2", "Option 3", "Another Option", "More Options"]
+# Daftar nama depan dan belakang Indonesia yang umum
+nama_depan = [
+    "Adi", "Budi", "Cahyo", "Dewi", "Eka", "Fajar", "Gita", "Hadi", "Indra", "Joko",
+    "Kartika", "Lestari", "Mulyadi", "Nugroho", "Putri", "Rahayu", "Sari", "Taufik", "Utami", "Wahyudi"
+]
 
-# Ambil input dari selectbox
-selected_option = st.selectbox("Choose an option:", options, key="selected_option", disabled=True)
+nama_belakang = [
+    "Saputra", "Santoso", "Wijaya", "Pratama", "Maulana", "Rahman", "Suryadi", "Hidayat", "Purnomo", "Susanto",
+    "Setiawan", "Nugraha", "Hartono", "Handayani", "Sudarmono", "Baskoro", "Suharto", "Firdaus", "Iskandar", "Syahputra"
+]
 
-# Cek apakah sudah ada input
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
+# Fungsi untuk menghasilkan 1 juta nama Indonesia secara acak
+@st.cache_data
+def generate_indonesian_names(n=1_000_000):
+    return [f"{random.choice(nama_depan)} {random.choice(nama_belakang)}" for _ in range(n)]
 
-# Tambahkan teks input di session state dengan widget yang tidak terlihat
-st.session_state.input_text = st.text_area("Hidden Input", "", key="hidden_input", label_visibility="collapsed")
+# Simpan daftar nama dalam session state agar tidak regenerasi setiap rerun
+if "all_names" not in st.session_state:
+    st.session_state.all_names = generate_indonesian_names()
 
-# Hitung jumlah kata
-word_count = len(st.session_state.input_text.split())
+# Inisialisasi session state untuk input pengguna jika belum ada
+if "selected_text" not in st.session_state:
+    st.session_state.selected_text = ""
 
-# Jika lebih dari 5 kata, aktifkan selectbox
-if word_count > 5:
-    st.selectbox("Choose an option:", options, key="selected_option", disabled=False)
+# Inisialisasi session state untuk hasil pencarian
+if "filtered_options" not in st.session_state:
+    st.session_state.filtered_options = ["Please type at least 5 characters"]
+
+# Filter hasil hanya jika input cukup panjang
+if len(st.session_state.selected_text) >= 5:
+    if "last_search" not in st.session_state or st.session_state.selected_text != st.session_state.last_search:
+        # Gunakan Jaro similarity untuk mencari nama yang paling mirip
+        similarity_scores = [
+            (name, jellyfish.jaro_similarity(st.session_state.selected_text.lower(), name.lower()))
+            for name in st.session_state.all_names
+        ]
+
+        # Urutkan berdasarkan skor kemiripan
+        sorted_names = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
+
+        # Ambil hanya nama unik dengan mempertahankan urutan
+        st.session_state.filtered_options = list(OrderedDict.fromkeys(name for name, score in sorted_names[:50]))
+
+        # Simpan input terakhir untuk menghindari filtering berulang
+        st.session_state.last_search = st.session_state.selected_text
+else:
+    # Jika input kurang dari 5 karakter, tampilkan pesan placeholder
+    st.session_state.filtered_options = ["Please type at least 5 characters"]
+
+# Input dengan stDatalist
+selected_input = stDatalist(
+    "Start typing (min. 5 characters to search names):",
+    st.session_state.filtered_options
+)
+
+# Tangkap input pengguna
+if selected_input:
+    st.session_state.selected_text = selected_input
+
+# Tambahkan tombol "Clear Name" untuk mereset input
+if st.button("Clear Name"):
+    # Reset input dan filter
+    st.session_state.selected_text = ""
+    st.session_state.filtered_options = ["Please type at least 5 characters"]
+    # Trigger rerun untuk memuat ulang aplikasi
+    st.rerun()
+
+# Debugging
+st.write(f"Input: {st.session_state.selected_text}")
+st.write(f"Filtered options: {st.session_state.filtered_options}")
